@@ -1,0 +1,32 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/mrjack/git/mission-geo/scripts/check_quality_gates.sh",
+            "timeout": 900,
+            "statusMessage": "Quality gate: analyze + test + navigation"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "mg-builder|mg-debugger",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/mrjack/git/mission-geo/scripts/check_quality_gates.sh --scan-all",
+            "timeout": 900,
+            "statusMessage": "Quality gate: builder/debugger handoff"
+          }
+        ]
+      }
+    ]
+  }
+}
