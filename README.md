@@ -57,7 +57,7 @@ scripts/
 6. Restart the session so the Agent Teams flag is picked up. Without it, `SendMessage` is unavailable and subagents are one-shot — the charter documents the fallback (§6).
 7. Optional but recommended: the [superpowers](https://github.com/obra/superpowers) skill pack — the debugger and the worktree skill reference `superpowers:systematic-debugging` and `superpowers:using-git-worktrees` when installed.
 
-Model choices in the agent frontmatter (`haiku` scout, `opus` architect/debugger, `sonnet` builder/inspector/shipper) are sensible defaults — adjust to taste and budget.
+Model choices in the agent frontmatter (`haiku` scout, `opus` architect/inspector/debugger, `sonnet` builder/shipper) are sensible defaults — adjust to taste and budget.
 
 ## Philosophy
 
