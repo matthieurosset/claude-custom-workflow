@@ -1,6 +1,6 @@
 ---
 name: git-workflow-branch-worktree
-description: Use before making any code or file change in this Mission Geo project, or when the user mentions branches, commits, merges, push, PRs, or any git operation. Triggers BEFORE the first Edit/Write of the session.
+description: Use before making any code or file change in this project, or when the user mentions branches, commits, merges, push, PRs, or any git operation. Triggers BEFORE the first Edit/Write of the session.
 ---
 
 # Git Workflow: Branch + Worktree First
@@ -14,23 +14,23 @@ The user has stated this is project policy and does not want to repeat it. Treat
 ## When to Apply
 
 **Apply BEFORE the first `Edit` / `Write` / `MultiEdit` / `NotebookEdit` of the session:**
-- New feature ("ajoute X", "implemente Y")
-- Bug fix ("corrige", "le rendu est cassé")
+- New feature ("add X", "implement Y")
+- Bug fix ("fix", "the rendering is broken")
 - Refactor, cleanup, simplification
 - Documentation edits (`CLAUDE.md`, README, files under `.claude/skills/`)
-- Config or dependency changes (`pubspec.yaml`, `*.gradle*`, asset additions)
+- Config or dependency changes (manifest/lockfiles, build config, asset additions)
 - Anything modifying a tracked file
 
 **Skip for:**
-- Read-only inspection: `Read`, `Grep`, `Glob`, `git status`, `git log`, `flutter analyze`
-- Files under `/tmp/` or outside the repo (e.g. `~/.bashrc`, `~/.android/avd/`)
-- Building/installing without committing (`flutter build`, screenshots)
+- Read-only inspection: `Read`, `Grep`, `Glob`, `git status`, `git log`, static analysis
+- Files under the scratch/temp directory or outside the repo (e.g. `~/.bashrc`)
+- Building/installing without committing (builds, screenshots)
 
 ## Project Convention
 
-- Worktrees live at `.worktrees/<slug>/` (already gitignored)
+- Worktrees live at `.worktrees/<slug>/` (make sure that path is gitignored)
 - Branch prefixes: `feat/<slug>`, `fix/<slug>`, `refactor/<slug>`, `docs/<slug>`, `chore/<slug>`
-- `<slug>` is kebab-case, descriptive: `feat/swipe-elo-header`, `fix/firebase-leaderboard-perms`, `docs/visual-validation-skill`
+- `<slug>` is kebab-case, descriptive: `feat/swipe-header`, `fix/leaderboard-perms`, `docs/validation-skill`
 
 ## The Workflow
 
@@ -43,33 +43,32 @@ Never collapse steps. Never skip step 3. Never `git push` before step 3.
 ### Step 1 — Branch + Worktree (MANDATORY first action)
 
 ```bash
-cd /home/mrjack/git/mission-geo
+cd <repo root>
 git worktree add -b <prefix>/<slug> .worktrees/<slug> main
 cd .worktrees/<slug>
 ```
 
-Then announce to the user: *"Je travaille sur la branche `<prefix>/<slug>` dans `.worktrees/<slug>`."*
+Then announce to the user: *"Working on branch `<prefix>/<slug>` in `.worktrees/<slug>`."*
 
-For non-trivial features, **REQUIRED SUB-SKILL: superpowers:using-git-worktrees** — it handles edge cases (uncommitted main changes, branch already exists, dirty state) and runs safety verification.
+For non-trivial features, if the `superpowers` skill pack is installed, **`superpowers:using-git-worktrees`** handles edge cases (uncommitted main changes, branch already exists, dirty state) and runs safety verification.
 
 All subsequent edits, builds, screenshots, MUST happen inside the worktree.
 
-Right after creation, echo the full absolute worktree path and use ONLY that prefix for every subsequent `Edit` — the primary directory shares identical relative paths, so a path-prefix typo silently edits the wrong tree. Check: before committing, `git status` inside the worktree MUST show your edit; if it doesn't, you edited the primary directory — revert there (scoped to your file only) and redo in the worktree. <!-- trigger: builder path-typo + busy primary dir during skill-note merge, 2026-07-11 -->
+Right after creation, echo the full absolute worktree path and use ONLY that prefix for every subsequent `Edit` — the primary directory shares identical relative paths, so a path-prefix typo silently edits the wrong tree. Check: before committing, `git status` inside the worktree MUST show your edit; if it doesn't, you edited the primary directory — revert there (scoped to your file only) and redo in the worktree.
 
 ### Step 2 — Implement
 
 Standard work loop. Commit progressively on the feature branch with descriptive messages. No `--no-verify`, no amending pushed commits, no hook bypassing. Stay on the feature branch.
 
-If visual changes: invoke `visual-validation-android` to validate before declaring complete.
+If visual changes: validate the rendering (your project's visual-validation skill, if any) before declaring complete.
 
 ### Step 3 — Validation Gate (MANDATORY)
 
 Before merging, the user must say something equivalent to:
-- "OK, ça marche"
-- "Valide"
-- "Tu peux merger"
+- "OK, it works"
+- "Approved"
+- "You can merge"
 - "Push"
-- "C'est bon, on merge"
 
 **If the user has NOT explicitly validated, STOP.** Show them the diff, the screenshots if visual, the test output, and wait. Never assume validation from silence or from "ok continue".
 
@@ -77,7 +76,7 @@ Before merging, the user must say something equivalent to:
 
 Only after explicit validation:
 ```bash
-cd /home/mrjack/git/mission-geo                  # back to main worktree
+cd <repo root>                                   # back to the primary checkout
 git checkout main
 git pull --ff-only origin main                   # ensure main is up to date
 git merge --no-ff <prefix>/<slug>                # preserve branch history
@@ -85,7 +84,7 @@ git merge --no-ff <prefix>/<slug>                # preserve branch history
 
 Resolve conflicts properly. Never `-X ours/theirs` blindly, never discard branch changes without asking.
 
-Never assume the primary directory can `git checkout main` — it may sit on another branch with another agent's uncommitted work. If merge-base(main, branch) equals main's tip, fast-forward via `git update-ref refs/heads/main <sha>` (no checkout needed). If real divergence, create a dedicated temporary worktree for `main` and merge there — never switch the primary directory's branch. If a `main`-tracking worktree already exists (e.g. `.worktrees/ship-main`), reuse it INSTEAD of creating a new one only if `git status --short` there is clean and it's already at `origin/main`'s tip — and never `git worktree remove` it afterward, since you didn't create it. <!-- trigger: builder path-typo + busy primary dir during skill-note merge, 2026-07-11 -->
+Never assume the primary directory can `git checkout main` — it may sit on another branch with another agent's uncommitted work. If merge-base(main, branch) equals main's tip, fast-forward via `git update-ref refs/heads/main <sha>` (no checkout needed). If real divergence, create a dedicated temporary worktree for `main` and merge there — never switch the primary directory's branch. If a `main`-tracking worktree already exists (e.g. `.worktrees/ship-main`), reuse it INSTEAD of creating a new one only if `git status --short` there is clean and it's already at `origin/main`'s tip — and never `git worktree remove` it afterward, since you didn't create it.
 
 ### Step 5 — Push
 
@@ -101,17 +100,18 @@ git worktree remove .worktrees/<slug>
 git branch -d <prefix>/<slug>                    # not -D unless user asks
 ```
 
-Run `git branch -d` from a worktree whose HEAD is already on `main` (e.g. `.worktrees/ship-main`) — from the primary checkout sitting on another branch, `-d` reports the target branch as "not fully merged" even when it is. <!-- trigger: shipper false alarm, 2026-07-11 -->
+Run `git branch -d` from a worktree whose HEAD is already on `main` (e.g. `.worktrees/ship-main`) — from the primary checkout sitting on another branch, `-d` reports the target branch as "not fully merged" even when it is.
 
-For PR-based flows or when discussion is needed, use **`superpowers:finishing-a-development-branch`** instead — it offers structured options (merge/PR/keep open).
+For PR-based flows or when discussion is needed, use a structured finishing flow instead (e.g. `superpowers:finishing-a-development-branch` if installed) — it offers merge/PR/keep-open options.
 
 ## Bash Hygiene & Fresh-Worktree Setup
 
-- Bash cwd resets between tool calls — prefix EVERY git/bash command with `cd <absolute worktree path> &&`, including read-only-seeming introspection (`git status`, `git log`, `git stash`). <!-- trigger: stash -u exécuté dans le checkout principal, a saisi les modifs d'une autre session, 2026-07-10 -->
-- Any dev/prod-flavor **device build** from a fresh worktree needs the gitignored App Check/signing files copied over first, not just "auth/signing" tasks — a worktree never inherits gitignored files. Right after creation: `ln -s /home/mrjack/git/mission-geo/android/key.properties android/key.properties`, `ln -s /home/mrjack/git/mission-geo/android/firebase_debug_token.dev.properties android/firebase_debug_token.dev.properties`, and `ln -s /home/mrjack/git/mission-geo/android/firebase_debug_token.prod.properties android/firebase_debug_token.prod.properties` if a prod-flavor build is also needed. Symptom if skipped: App Check 403 "App attestation failed" → "Something went wrong" on any authenticated flow (e.g. onboarding account creation) — reads like a network/env bug, not a missing file. <!-- trigger: fresh worktree → App Check broken → PERMISSION_DENIED blocked on-device purchase/auth repro, debugger, 2026-07-11; inspector lost hours on missing token in fresh worktree, onboarding overlay fixes, 2026-07-13 -->
-- In a freshly created worktree, run `flutter pub get` first. If `flutter test` then fails on tests unrelated to your diff (e.g. an `ink_sparkle.frag` SkSL/Vulkan shader crash), run `flutter clean && flutter pub get` and retest — and check whether it also fails on `main` — before calling it "pre-existing". <!-- trigger: 4 faux échecs "préexistants" dus au cache de build du worktree, 2026-07-10 -->
-- Before merging, evaluate a branch's real file scope with `git diff main...branch` (merge-base, three-dot) — `git diff main..branch` (two-dot) lists misleading files when the branch forked from an older `main`. <!-- trigger: Shipper misread branch scope pre-merge via two-dot diff, 2026-07-10 -->
-- `cd` OUT of a worktree (e.g. back to the primary directory) before running `git worktree remove` on it — removing the directory your shell is currently inside breaks its cwd and every chained command after. <!-- trigger: chantier username-moderation, 2026-07-11 -->
+- Bash cwd resets between tool calls — prefix EVERY git/bash command with `cd <absolute worktree path> &&`, including read-only-seeming introspection (`git status`, `git log`, `git stash`).
+- A fresh worktree never inherits **gitignored** files. If your builds need gitignored secrets/config (signing keys, local tokens, `.env`), symlink them from the primary checkout right after creation — the symptom of forgetting is an auth/attestation error that reads like a network/env bug, not a missing file. List your project's required files here:
+  - `ln -s <repo root>/<path-to-gitignored-file> <same relative path>` (one per file)
+- In a freshly created worktree, run your dependency install first (`npm ci`, `pub get`, `pip install`…). If the test suite then fails on tests unrelated to your diff, clean the build cache and retest — and check whether it also fails on `main` — before calling it "pre-existing".
+- Before merging, evaluate a branch's real file scope with `git diff main...branch` (merge-base, three-dot) — `git diff main..branch` (two-dot) lists misleading files when the branch forked from an older `main`.
+- `cd` OUT of a worktree (e.g. back to the primary directory) before running `git worktree remove` on it — removing the directory your shell is currently inside breaks its cwd and every chained command after.
 
 ## Rationalizations to Reject
 
@@ -129,7 +129,7 @@ For PR-based flows or when discussion is needed, use **`superpowers:finishing-a-
 ## Red Flags — STOP
 
 **Before any `Edit` / `Write`:**
-- `pwd` shows `/home/mrjack/git/mission-geo` (the main worktree)?
+- `pwd` shows the repo root (the primary checkout)?
 - `git branch --show-current` returns `main`?
 
 → If yes to either, STOP. Branch + worktree first. Then proceed in the worktree.
@@ -143,7 +143,7 @@ For PR-based flows or when discussion is needed, use **`superpowers:finishing-a-
 
 ```bash
 # START a task
-cd /home/mrjack/git/mission-geo
+cd <repo root>
 git worktree add -b feat/my-feature .worktrees/my-feature main
 cd .worktrees/my-feature
 
@@ -151,7 +151,7 @@ cd .worktrees/my-feature
 git add <files> && git commit -m "feat: ..."
 
 # FINISH (only after explicit user validation)
-cd /home/mrjack/git/mission-geo
+cd <repo root>
 git checkout main && git pull --ff-only
 git merge --no-ff feat/my-feature
 git push origin main
@@ -163,10 +163,10 @@ git branch -d feat/my-feature
 
 If the rule was violated and uncommitted changes exist on `main`:
 ```bash
-cd /home/mrjack/git/mission-geo
+cd <repo root>
 git stash --include-untracked            # save the work
 git worktree add -b <prefix>/<slug> .worktrees/<slug> main
 cd .worktrees/<slug>
 git stash pop                            # bring the work into the worktree
 ```
-Verify `main` is now clean (`git status` in the main worktree) before continuing.
+Verify `main` is now clean (`git status` in the primary checkout) before continuing.

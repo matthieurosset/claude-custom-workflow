@@ -8,20 +8,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/mrjack/git/mission-geo/scripts/check_quality_gates.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/check_quality_gates.sh",
             "timeout": 900,
-            "statusMessage": "Quality gate: analyze + test + navigation"
+            "statusMessage": "Quality gate: static analysis + tests + conventions"
           }
         ]
       }
     ],
     "SubagentStop": [
       {
-        "matcher": "mg-builder|mg-debugger",
+        "matcher": "builder|debugger",
         "hooks": [
           {
             "type": "command",
-            "command": "/home/mrjack/git/mission-geo/scripts/check_quality_gates.sh --scan-all",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/check_quality_gates.sh --scan-all",
             "timeout": 900,
             "statusMessage": "Quality gate: builder/debugger handoff"
           }
