@@ -1,6 +1,6 @@
 # claude-custom-workflow
 
-A **multi-agent orchestration workflow for [Claude Code](https://claude.com/claude-code)**: one lead agent as the user's sole interlocutor, six specialist subagents, hard guardrails, mechanical quality gates enforced by hooks, and a self-improving process loop.
+A **multi-agent orchestration workflow for [Claude Code](https://claude.com/claude-code)**: one lead agent as the user's sole interlocutor, five specialist subagents, hard guardrails, mechanical quality gates enforced by hooks, and a self-improving process loop.
 
 This is the generic version of a workflow battle-tested daily on a production Flutter/Firebase mobile game by a solo developer. Everything project-specific has been replaced by `<placeholders>` and `TEMPLATE` notes; the architecture, contracts, and hard-won rules are intact. (The original as-deployed snapshot, Flutter specifics included, is the first commit of this repo's history.)
 
@@ -11,14 +11,13 @@ The user talks to **one agent only**: the lead. The lead never edits code itself
 | Role | Mission |
 |---|---|
 | **lead** | Sole user contact (bootstrapped by `CLAUDE.md` + `.claude/lead-charter.md`). Routes, synthesises, guarantees. |
-| **scout** | Repo reconnaissance → structured brief + `QUESTIONS_FOR_USER:` block. Read-only. |
-| **architect** | Brief + answers → concrete implementation plan. Read-only. |
+| **architect** | Intake + recon + planning, phased: `Explore` fan-out recon → brief + `QUESTIONS_FOR_USER:` → iterate on the user's answers → final plan. Read-only, and search-tool-less by design (Read + Agent only) so all discovery is delegated to cheap Explore subagents. |
 | **builder** | Creates a git worktree, writes the code, applies the project's convention skills, commits. |
 | **inspector** | Quality gate: static analysis, tests, visual validation, security checks, code review. |
 | **debugger** | Root-cause analysis via a mandatory 4-step systematic loop; small fixes directly, big ones handed to builder. |
 | **shipper** | Merge → push → (store/production deploys only on explicit user order) → post-release KPI check. |
 
-Routing is graduated by demand size — typo → builder direct; big ambiguous feature → full scout → architect → builder → inspector → shipper chain — because every handoff loses context and multi-agent costs 3–10× in tokens (`lead-charter.md` §2).
+Routing is graduated by demand size — typo → builder direct; big ambiguous feature → phased architect → builder → inspector → shipper chain — because every handoff loses context and multi-agent costs 3–10× in tokens (`lead-charter.md` §2). The architect's phases (recon → questions → plan) run inside one persistent agent, so nothing is re-read between them.
 
 ## Mechanisms worth stealing
 
@@ -37,8 +36,8 @@ CLAUDE.md.template         # Paste at the top of your CLAUDE.md — bootstraps t
 .claude/
 ├── lead-charter.md        # The orchestration contract — start here
 ├── settings.json          # Agent Teams flag + quality-gate hooks
-├── agents/                # The six specialist subagent contracts
-│   ├── scout.md · architect.md · builder.md
+├── agents/                # The five specialist subagent contracts
+│   ├── architect.md · builder.md
 │   └── inspector.md · debugger.md · shipper.md
 ├── evals/                 # Protocol + scenario templates replayed before process edits
 └── skills/
@@ -51,13 +50,13 @@ scripts/
 
 1. **Copy** `.claude/` and `scripts/` into your repo; paste `CLAUDE.md.template`'s section at the top of your `CLAUDE.md`.
 2. **Search for `<angle brackets>` and `TEMPLATE` notes** — each marks a decision: your repo root, your stack's analysis/test commands (3 functions in `check_quality_gates.sh`), your project skills (`<your-design-system-skill>`, `<your-visual-validation-skill>`, …). Drop references to skills you don't have; the workflow degrades gracefully.
-3. **Fill the scout's repo cheat-sheet** (`.claude/agents/scout.md`) — 5-10 bullets pointing at your load-bearing directories.
+3. **Fill the architect's repo cheat-sheet** (`.claude/agents/architect.md`) — 5-10 bullets pointing at your load-bearing directories, used to orient its Explore fan-outs.
 4. **Gitignore** `.worktrees/` and `claude-progress.json`.
 5. **Rewrite the eval scenarios** (`.claude/evals/scenarios.md`) against your real codebase — the shipped ones are shapes, not runnable evals.
 6. Restart the session so the Agent Teams flag is picked up. Without it, `SendMessage` is unavailable and subagents are one-shot — the charter documents the fallback (§6).
 7. Optional but recommended: the [superpowers](https://github.com/obra/superpowers) skill pack — the debugger and the worktree skill reference `superpowers:systematic-debugging` and `superpowers:using-git-worktrees` when installed.
 
-Model choices in the agent frontmatter (`haiku` scout, `opus` architect/inspector/debugger, `sonnet` builder/shipper) are sensible defaults — adjust to taste and budget.
+Model choices in the agent frontmatter (`opus` architect/inspector/debugger, `sonnet` builder/shipper — with the architect's searches delegated to `haiku`-class Explore agents) are sensible defaults — adjust to taste and budget.
 
 ## Philosophy
 

@@ -36,4 +36,4 @@ evidence: 1 line per criterion — the observed proof (command, file, quote), no
 - Exclusive resource required (emulator, test server) → the usual shared claiming mechanism,
   never an eval scenario in parallel with a real validation run.
 
-Scenarios: `scenarios.md` (suggested tags: `git-workflow`, `i18n`, `design-system`, `conventions`, `debugger`, `inspector`, `integration`, `scope`).
+Scenarios: `scenarios.md` (suggested tags: `git-workflow`, `i18n`, `design-system`, `conventions`, `architect`, `debugger`, `inspector`, `integration`, `scope`).

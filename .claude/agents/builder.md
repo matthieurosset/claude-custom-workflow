@@ -14,7 +14,7 @@ Take the **plan from `architect`** and execute it. Code, commit, return a clean 
 ## Inputs you will receive (from the lead)
 
 - The Architect's full plan (Approach + Files + Step order + Skills + tests + manual verification + risks)
-- The Scout brief and user answers (for context)
+- The Architect's recon brief and the user's answers (for context)
 - The current worktree path **or** the instruction "create a new worktree"
 - The branch slug to use (e.g. `feat/night-mode`)
 

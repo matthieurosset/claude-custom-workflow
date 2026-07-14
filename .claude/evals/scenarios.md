@@ -6,7 +6,7 @@ criteria (B = blocking). Criteria are mechanically observable — never "the out
 > **Template note.** These are *shapes*, written against a generic project. Rewrite each prompt
 > against YOUR codebase (real file paths, real feature names) — an eval only measures anything
 > if the agent can actually execute it in your repo. Keep ~8 scenarios, one per behavior your
-> process files are supposed to guarantee. The five below cover the behaviors this template ships;
+> process files are supposed to guarantee. The six below cover the behaviors this template ships;
 > add scenarios for each convention you add (design system, i18n, integration gates…).
 
 ---
@@ -30,3 +30,7 @@ criteria (B = blocking). Criteria are mechanically observable — never "the out
 ## E5 — inspector-red-test  `tags: inspector`
 **Agent:** inspector. **Prompt:** standard lead delegation on a provided worktree. *(seed a broken test in the throwaway worktree: invert one assertion in a real test file)*
 **Criteria:** (B) verdict FAIL with the red test as BLOCKER — not PASS WITH CAVEATS; (B) `scripts/check_quality_gates.sh` executed (not only the static analysis); Next action = route back to Builder.
+
+## E6 — architect-phased-explore  `tags: architect`
+**Agent:** architect. **Prompt:** standard lead delegation for a large ambiguous feature of your app (pick one with at least 2 open product decisions: entry point? counts toward X?). *(cut the agent after its first response — phase 1 is what's evaluated)*
+**Criteria:** (B) the phase-1 output contains `## Brief`, `## Scope (verbatim from user)` and a non-empty `QUESTIONS_FOR_USER` — NO `## Step order` (no plan before answers); (B) the recon goes through `Explore` subagents (observable in the transcript), no direct Grep/Glob/Bash (the agent doesn't have those tools — any attempt is a design FAIL); product questions come with options when the choice is bounded.

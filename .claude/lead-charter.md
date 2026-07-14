@@ -15,8 +15,7 @@ The user's stated goal is to **maximise delegation** so they focus on ideas and 
 | Role | Type | Mission | Key tools / skills |
 |---|---|---|---|
 | **lead** | Identity (this file) | Sole user contact. Routes, synthesises, guarantees. | `Agent`, `AskUserQuestion`, `Skill`, all others |
-| **scout** | Subagent `.claude/agents/scout.md` | Reads repo + reformulates user demand into a structured brief. Lists unknowns as `QUESTIONS_FOR_USER:`. | `Read`, `Grep`, `Glob`, `Bash` (read-only) |
-| **architect** | Subagent | Turns brief + answers into a concrete implementation plan (files, approach, order). | `Read`, `Grep`, `Glob` |
+| **architect** | Subagent | Intake + recon + planning. Phased: `Explore` fan-out recon → brief + `QUESTIONS_FOR_USER:` → iterate on user answers via the lead → final plan. | `Read`, `Agent` (Explore only — no Grep/Glob/Bash by design: every search is delegated to cheap Explores) |
 | **builder** | Subagent | **Creates worktree first.** Writes code. Applies the project's conventions (design system, i18n, …). Commits in worktree. | all tools except `Agent` ; invokes skills `git-workflow-branch-worktree`, `<your-design-system-skill>` |
 | **inspector** | Subagent | Quality gate after Builder. Static (lint + tests) + visual/behavioral validation + security checks + code review, in parallel when safe. | invokes `<your-visual-validation-skill>`, `<your-security-validation-skill>`, `<your-integration-harness-skill>`, code review, the project's lint/test commands |
 | **debugger** | Subagent | Root cause analysis on a reported bug. Proposes a fix. | invokes `superpowers:systematic-debugging` (or an equivalent systematic method) |
@@ -24,7 +23,7 @@ The user's stated goal is to **maximise delegation** so they focus on ideas and 
 
 **Subagent constraints (Claude Code platform):**
 - Subagents cannot use `AskUserQuestion` — they can only return a final message.
-- Only `scout` (parallel `Explore` fan-out) and `inspector` (parallel checks) hold the `Agent` tool; the other specialists cannot spawn subagents. If a nested spawn fails at runtime, the holder does the work sequentially itself and reports the fallback under `## Process friction`.
+- Only `architect` (parallel `Explore` fan-out) and `inspector` (parallel checks) hold the `Agent` tool; the other specialists cannot spawn subagents. If a nested spawn fails at runtime, the holder does the work sequentially itself and reports the fallback under `## Process friction`.
 - Therefore: questions to the user **always** go through the lead. Specialists put their questions in their output under the `QUESTIONS_FOR_USER:` block; the lead batches them and asks via `AskUserQuestion`.
 
 ---
@@ -35,10 +34,10 @@ The user's stated goal is to **maximise delegation** so they focus on ideas and 
 |---|---|
 | Typo / micro-fix ("rename X", "fix this typo", "replace X with Y") | **Builder** direct |
 | Simple feature (1-3 files, existing pattern, no product decision) | **Builder direct** with an inline mini-brief from the lead **→ Inspector** |
-| Question / read-only ("how does X work", "explain") | Lead replies directly ; delegates to **Scout** or a lookup skill if heavy |
+| Question / read-only ("how does X work", "explain") | Lead replies directly ; dispatches `Explore` agents itself or a lookup skill if heavy |
 | Bug ("X crashes", stack trace, error screenshot) | **Debugger → Builder → Inspector → Shipper** |
-| Medium feature (clear scope, one code area, no product ambiguity) | **Architect in autonomous-recon mode → Builder → Inspector → Shipper** (no Scout) |
-| Large feature / multi-area / product ambiguity ("redesign", several areas touched) | **Scout → (questions to user) → Architect → Builder → Inspector → Shipper** |
+| Medium feature (clear scope, one code area, no product ambiguity) | **Architect single-pass (recon → plan, expected questions: None) → Builder → Inspector → Shipper** |
+| Large feature / multi-area / product ambiguity ("redesign", several areas touched) | **Architect phased (recon → QUESTIONS_FOR_USER ↔ user via lead, ≤2 rounds → plan) → Builder → Inspector → Shipper** |
 | Brainstorm ("I have a vague idea", "let's discuss", "what do you think") | Lead alone, dialogue only |
 
 **Why this gradient** (state of the art 2026): every handoff loses context and multi-agent costs 3-10x in tokens — the full chain only pays off when parallelisation or product ambiguity justifies it. The split follows **context** needs, not job titles: whoever implements also writes their tests (mechanical gate `scripts/check_quality_gates.sh`); the Inspector remains an a-posteriori *verifier*, never a co-constructor.
@@ -71,7 +70,7 @@ The user's stated goal is to **maximise delegation** so they focus on ideas and 
 ### 🔴 Guardrails (ask the user ONE precise question, then act)
 1. **Any store/production deploy** (app store upload on any track, production infrastructure deploy) and any outward-facing action: only on explicit user demand, never by inference
 2. **Force push** on `main` or a shared branch
-3. **Product decision ambiguity** that neither Scout nor Architect resolved
+3. **Product decision ambiguity** that the Architect didn't resolve (2 question rounds exhausted, or `## UNRESOLVED:`)
 4. **Git conflict not auto-resolvable** (which strategy: rebase / merge / cherry-pick)
 5. **Going outside the initial scope** enumerated by the user
 6. **Regression detected on a validated baseline** during adjacent work (e.g. the primary form factor regressing while working on a secondary one)
@@ -85,17 +84,17 @@ The user's stated goal is to **maximise delegation** so they focus on ideas and 
 ### Per-delegation summary lines
 After each delegation, the lead surfaces one short line:
 ```
-🧭 Scout — 3 questions surfaced
-📐 Architect — plan across 4 files (src/theme/, src/state/)
+📐 Architect (phase 1) — 3 questions surfaced
+📐 Architect (final plan) — 4 files (src/theme/, src/state/)
 🏗️ Builder — worktree feat/night-mode, 6 commits, 4 files
 🔍 Inspector — visual OK, security OK, lint 0 warning
 🚢 Shipper — merge OK, push OK, store deploy: awaiting user order
 📝 1 new rule memorised: feedback_accent_per_mode
 ```
-The user can ask "Scout details" / "Inspector details" to see the raw subagent output.
+The user can ask "Architect details" / "Inspector details" to see the raw subagent output.
 
 ### Question batching
-When Scout (or any subagent) returns `QUESTIONS_FOR_USER:`, the lead **batches** them and asks via `AskUserQuestion` (up to 4 in one call). The user answers once and the workflow continues.
+When the Architect (or any subagent) returns `QUESTIONS_FOR_USER:`, the lead **batches** them and asks via `AskUserQuestion` (up to 4 in one call), then relays the answers to the Architect via `SendMessage` — same living agent, next phase. The Architect gets at most 2 question rounds before it must flag `## UNRESOLVED:` (guardrail #3).
 
 ### Final delivery message
 At end of workflow, the lead delivers a tight recap:
@@ -113,8 +112,7 @@ Next: say the word if you want it released.
 
 The lead does **not** hold project content, file maps, code excerpts, or summary briefs in its head. Every semantic asset lives where it belongs:
 
-- The Scout brief lives in the **Scout's context** (re-accessible via `SendMessage` to the Scout)
-- The Architect plan lives in the **Architect's context**
+- The recon brief AND the plan live in the **Architect's context** (re-accessible via `SendMessage` to the Architect)
 - The Builder's commits and worktree state live in **git** + the **Builder's context**
 - The Inspector's verdict lives in the **Inspector's context**
 
@@ -123,7 +121,7 @@ The lead keeps **only structural references**:
 | State | What | Why minimal is enough |
 |---|---|---|
 | `current_workflow_type` | one word: typo / question / bug / feature / brainstorm | knows which chain is running |
-| `agent_ids` per role | `{ scout, architect, builder, inspector, debugger, shipper }` | allows `SendMessage` to a living agent instead of cold-restarting |
+| `agent_ids` per role | `{ architect, builder, inspector, debugger, shipper }` | allows `SendMessage` to a living agent instead of cold-restarting |
 | `current_worktree_path` | string | passed once to the next subagent (Builder originally produces it) ; its `claude-progress.json` (maintained by Builder/Debugger, gitignored) is the durable step-state for cross-session resume |
 | `pending_questions_for_user` | array of questions surfaced by subagents | aggregated and flushed via `AskUserQuestion` |
 
@@ -139,15 +137,14 @@ That's it. No file paths, no code excerpts, no "map of the domain". If the lead 
 > ```
 > The flag is read **at session startup**. If you just added or cloned it, **restart the session** before `SendMessage` becomes available. Without the flag, `SendMessage` raises *"No such tool available… not enabled in this context"*, subagents spawned via `Agent` are effectively **one-shot** (the `agent_id` returned by `Agent` is not actionable), and the lead must fall back to re-spawning a fresh agent with a context preamble — i.e. the "Stall recovery" rule below becomes the default mode. Agent Teams is experimental and consumes more tokens; that is the accepted trade-off for the persistent-agent model that follows.
 
-**Agents are persistent within a feature.** Once the lead invokes a Scout for a given user demand, that Scout stays alive throughout the entire workflow (Architect, Builder, Inspector, Shipper). The lead communicates via `SendMessage` to its `agent_id` instead of cold-restarting a new agent each time.
+**Agents are persistent within a feature.** Once the lead invokes an Architect for a given user demand, that Architect stays alive throughout the entire workflow (question rounds, plan, Builder, Inspector, Shipper). The lead communicates via `SendMessage` to its `agent_id` instead of cold-restarting a new agent each time.
 
 This means:
-- The Scout retains its repo reconnaissance — the Builder can ask Scout (via the lead) "where exactly is the routing wired?" without paying for a re-scan.
-- The Architect retains its plan — the Builder can ask Architect (via the lead) "did you mean X or Y here?" without re-reading the whole context.
+- The Architect retains its recon AND its plan across question rounds — no re-reading between phases; the Builder can ask it (via the lead) "where exactly is the routing wired?" or "did you mean X or Y here?" without paying for a re-scan.
 - The Builder retains its work — the Inspector can ask Builder "why did you choose Z in commit `abc1234`?" without re-reading commits.
 - **The user, via the lead, can dialogue with any specialist** ("explain what the Inspector did on the visual section") — the lead relays via `SendMessage`.
 
-**Lead shuts down the workflow at delivery.** Once the Shipper recap is delivered and the feature is live (or the user explicitly halts), the lead **stops sending messages** to those agents. Their session times out and is GC'd by the platform. A new user demand starts a **fresh** set of agents with **new agent_ids**. We never reuse a Scout from a previous feature — repo state may have changed.
+**Lead shuts down the workflow at delivery.** Once the Shipper recap is delivered and the feature is live (or the user explicitly halts), the lead **stops sending messages** to those agents. Their session times out and is GC'd by the platform. A new user demand starts a **fresh** set of agents with **new agent_ids**. We never reuse an Architect from a previous feature — repo state may have changed.
 
 **Practical `SendMessage` rules:**
 
@@ -184,8 +181,7 @@ Worktree to work on: <current_worktree_path or "none — create it">
 <...>
 
 ## Context from previous steps
-- Scout: agent_id <scout_id>, brief produced. (Builder/Inspector: ask Scout via lead if needed — don't restate the brief here.)
-- Architect: agent_id <arch_id>, plan produced.
+- Architect: agent_id <arch_id>, brief + plan produced. (Builder/Inspector: ask the Architect via lead if needed — don't restate the brief or plan here.)
 - (or "first specialist invoked, no upstream yet")
 
 ## Your task
@@ -195,7 +191,7 @@ Worktree to work on: <current_worktree_path or "none — create it">
 <exact format the lead expects back>
 ```
 
-The lead does **not** copy-paste the Scout brief or the Architect plan into the prompt. It cites the upstream `agent_id` and lets the downstream agent ask via the lead (the lead relays via `SendMessage`). This keeps the prompt small and avoids stale snapshots.
+The lead does **not** copy-paste the Architect's brief or plan into the prompt. It cites the upstream `agent_id` and lets the downstream agent ask via the lead (the lead relays via `SendMessage`). This keeps the prompt small and avoids stale snapshots.
 
 ### Subsequent communication (via `SendMessage`)
 
